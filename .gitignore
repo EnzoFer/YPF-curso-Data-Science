@@ -1,0 +1,26 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+# Entornos virtuales (El ropero se queda en local) 
+.venv/ 
+venv/ 
+ENV/ 
+env/ 
+# Archivos temporales y caché de Python 
+__pycache__/ 
+*.py[cod] 
+*$py.class 
+# Puntos de control de Jupyter Notebooks 
+.ipynb_checkpoints/ 
+# Claves secretas y variables de entorno 
+.env 
+# Archivos ocultos del sistema operativo 
+.DS_Store 
+Thumbs.db
+
+# Archivos del entorno virtual creado en la raíz
+Lib/
+Scripts/
+Include/
+share/
+pyvenv.cfg
+activar.bat
+start.ps1
