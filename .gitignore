@@ -24,3 +24,7 @@ share/
 pyvenv.cfg
 activar.bat
 start.ps1
+
+# Archivos pesados de datos (exceden el limite de 100MB de GitHub)
+*.csv
+Final/*.csv
