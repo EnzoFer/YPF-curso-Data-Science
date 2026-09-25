@@ -28,4 +28,7 @@ start.ps1
 # Archivos pesados de datos (exceden el limite de 100MB de GitHub)
 *.csv
 Final/*.csv
+
+# Cosas que no quiero subir al repositorio
 Final/*.md
+Presentaciones/Resumen_IA_clases.pdf
