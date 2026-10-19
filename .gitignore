@@ -31,4 +31,5 @@ Final/*.csv
 
 # Cosas que no quiero subir al repositorio
 Final/*.md
+!Final/README.md
 Presentaciones/Resumen_IA_clases.pdf
