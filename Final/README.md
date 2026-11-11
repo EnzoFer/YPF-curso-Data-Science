@@ -1,118 +1,68 @@
-# Predicción de Daño en Veredas por Arbolado Urbano (NYC)
+# VeredaSegura: análisis de daño observado en veredas junto a árboles (NYC)
 
-**Proyecto Final – Curso de Data Science / IA – Fundación YPF**
+**Proyecto final — Data Science / EnergIA Digital 2026.** Equipo: Enzo Fernández (`enzo21fermon@gmail.com`), Juan Ignacio Olivares (`juaniolivares95@gmail.com`) y Gabriel Quispe (`gquispe34@gmail.com`). El objetivo es estudiar si características registradas de un árbol y su entorno se asocian con que la vereda contigua haya sido registrada como dañada. La motivación social es aportar evidencia exploratoria para una eventual priorización de inspecciones municipales; el sistema no prescribe intervenciones.
 
-| | |
-|---|---|
-| **Grupo N°** | _completar_ |
-| **Integrantes** | _Nombre Apellido 1_, _Nombre Apellido 2_, _Nombre Apellido 3_ |
-| **Notebook principal** | [`Final.ipynb`](Final.ipynb) |
+## Problema, variable objetivo y alcance
 
----
+Se plantea una clasificación binaria a partir de `sidewalk`: `Damage` (1) o `NoDamage` (0). Se excluye `sidewalk` de las variables predictoras. La etiqueta es el estado observado durante el relevamiento de 2015; por lo tanto **el proyecto clasifica daño observado y no pronostica cuándo se romperá una vereda**. No es causal ni reemplaza una inspección. Antes de una aplicación real habría que validar la utilidad con autoridades, residentes y datos recientes del lugar.
 
-## 1. Descripción del problema
+## Dataset y procedencia
 
-Las raíces de los árboles de vereda levantan y rompen las baldosas, generando riesgo de caídas para los peatones, reclamos legales y costos de reparación para la ciudad. Hoy las inspecciones se hacen de forma reactiva (cuando alguien reclama).
-
-**Objetivo de negocio:** dar a los departamentos de obras públicas una herramienta para **priorizar inspecciones** de veredas según las características de cada árbol.
-
-**Pregunta que responde el modelo:**
-> Dadas las características físicas de un árbol vivo (diámetro, especie, salud), su entorno (barrio, ubicación respecto al cordón, protecciones) y los conflictos observados en raíces, tronco y ramas, **¿la vereda junto a ese árbol presenta daño?**
-
-- **Tipo de problema:** Clasificación binaria supervisada.
-- **Por qué es Machine Learning y no un cálculo:** el estado de la vereda (`sidewalk`) es una observación independiente; no puede obtenerse mediante ninguna fórmula a partir de las demás columnas.
-
----
-
-## 2. Dataset
-
-- **Nombre:** 2015 Street Tree Census – Tree Data (NYC Parks)
-- **Fuente:** [NYC Open Data](https://data.cityofnewyork.us/Environment/2015-Street-Tree-Census-Tree-Data/uvpi-gqnh/about_data)
-- **Tamaño original:** 683.788 filas × 45 columnas (un registro por árbol).
-- **Tamaño tras la limpieza:** ~652.000 árboles vivos con estado de vereda registrado. Para el modelado se usa un submuestreo estratificado de 100.000 registros (80% train / 20% test).
-
-> El archivo CSV (~285 MB) no se sube al repositorio por su tamaño. Hay que descargarlo desde el link y guardarlo en esta carpeta con el nombre `2015_Street_Tree_Census_-_Tree_Data_20260914.csv`.
-
----
-
-## 3. Variable objetivo (y)
-
-| Columna | Origen | Valores | Distribución |
-|---|---|---|---|
-| `target` | Derivada de `sidewalk` | `1` = Damage (vereda dañada), `0` = NoDamage | ~29% / ~71% (desbalance moderado) |
-
-La columna `sidewalk` original y cualquier columna derivada de ella se **excluyen de X** para evitar fuga de información (target leakage).
-
----
-
-## 4. Variables predictoras (X)
-
-| Variable | Tipo | Descripción | Unidad / Valores |
-|---|---|---|---|
-| `tree_dbh` | Numérica | Diámetro del tronco medido a 1,37 m del suelo | Pulgadas (1 a 60) |
-| `root_conflict_score` | Numérica (creada) | Cantidad de problemas en raíces: piedras, rejillas u otros (`root_stone`, `root_grate`, `root_other`) | 0 a 3 |
-| `trunk_conflict_score` | Numérica (creada) | Cantidad de problemas en tronco: cables, luces u otros (`trunk_wire`, `trnk_light`, `trnk_other`) | 0 a 3 |
-| `branch_conflict_score` | Numérica (creada) | Cantidad de problemas en ramas: luces, zapatillas colgadas u otros (`brch_light`, `brch_shoe`, `brch_other`) | 0 a 3 |
-| `steward` | Ordinal | Cantidad de señales de cuidado vecinal | None < 1or2 < 3or4 < 4orMore |
-| `health` | Ordinal | Estado de salud percibido del árbol | Poor < Fair < Good |
-| `borough` | Nominal | Distrito de NYC | Manhattan, Bronx, Brooklyn, Queens, Staten Island |
-| `guards` | Nominal | Tipo de protección alrededor del árbol | None, Helpful, Harmful, Unsure |
-| `curb_loc` | Nominal | Ubicación respecto al cordón | OnCurb, OffsetFromCurb |
-| `spc_clean` | Nominal (creada) | Especie (nombre científico): las 20 más frecuentes + `Other` | 21 categorías |
-
-**Columnas descartadas:** identificadores (`tree_id`, `block_id`), coordenadas y códigos administrativos (sin señal analítica o redundantes), fechas y datos del relevamiento, y los árboles muertos o tocones (no tienen dato de `sidewalk`).
-
----
-
-## 5. Metodología
-
-1. **Limpieza:** filtrado de árboles vivos con target registrado, imputación de nulos con significado (`steward`, `guards` → `'None'`) y eliminación de diámetros imposibles (0 o > 60").
-2. **EDA:** relación del daño con el diámetro, los conflictos de raíz y la especie.
-3. **Feature engineering:** puntajes de conflicto y reducción de la cantidad de especies.
-4. **Partición:** `train_test_split` estratificado; el test se separa **una sola vez** al inicio y no se usa hasta la evaluación final.
-5. **Preprocesamiento en `Pipeline` + `ColumnTransformer`** (escalado, codificación ordinal y One-Hot) para evitar fugas entre folds.
-6. **Métrica rectora: F1-Score de la clase Damage.** No se usa Accuracy porque las clases están desbalanceadas: un modelo que nunca detecta daño ya acierta el 71%. Una vereda rota no detectada (falso negativo) es el error más costoso.
-7. **Comparación multimodelo con `StratifiedKFold` (5 folds):** Dummy Classifier, Regresión Logística, Árbol de Decisión y Random Forest, reportando métricas de train y de validación.
-8. **Optimización del modelo final (Random Forest)** con `GridSearchCV`.
-9. **Evaluación final en test:** comparación train vs test (sobreajuste), matriz de confusión, ROC-AUC y contraste contra el Dummy.
-10. **Interpretabilidad:** importancia por permutación y dependencia parcial.
-
----
-
-## 6. Resultados
-
-| Modelo | F1 Damage (CV) | F1 Damage (Test) | Recall Damage (Test) | ROC-AUC (Test) |
-|---|---|---|---|---|
-| Dummy (most_frequent) | 0.000 | 0.000 | 0.000 | 0.500 |
-| Árbol de Decisión (max_depth=6) | 0.540 | – | – | – |
-| Regresión Logística | 0.541 | – | – | – |
-| **Random Forest optimizado** | **0.548** | **0.543** | **0.606** | **0.737** |
-
-- Los modelos que no se eligieron solo se evaluaron con validación cruzada. El test se usó **una sola vez**, con el modelo final.
-- **Hiperparámetros finales:** `n_estimators=200`, `max_depth=16`, `min_samples_leaf=10`, `class_weight='balanced'`.
-- **Sobreajuste:** el F1 da 0.564 en train y 0.543 en test, una brecha de 0.02.
-
-**Variables más influyentes** (importancia por permutación, caída del F1 en test):
-1. `root_conflict_score` (0.113)
-2. `tree_dbh` (0.031)
-3. `borough` (0.013)
-4. `spc_clean` (0.011)
-
-El riesgo de daño sube fuerte entre 5 y 15 pulgadas de diámetro y después se estabiliza. Tener el primer conflicto de raíz es lo que más aumenta el riesgo.
-
----
-
-## 7. Cómo ejecutar
+Fuente: [NYC Open Data — 2015 Street Tree Census, Tree Data](https://data.cityofnewyork.us/Environment/2015-Street-Tree-Census-Tree-Data/uvpi-gqnh). El censo original contiene aproximadamente 683.788 registros y 45 columnas. `download_dataset.py` consulta la API pública de Socrata, conserva árboles vivos con `sidewalk` conocido y diámetro entre 1 y 60 pulgadas, y selecciona de manera aleatoria reproducible hasta 100.000 registros (semilla 42). El archivo incluido en `data/nyc_tree_census_sample.csv` tiene 100.000 filas: 71.223 `NoDamage` y 28.777 `Damage`. El script permite regenerarlo. La atribución y URL quedan documentadas aquí y en el propio script; revisar los términos del portal antes de redistribuir.
 
 ```bash
-pip install pandas numpy matplotlib seaborn scikit-learn jupyter
-jupyter notebook Final.ipynb
+python download_dataset.py --rows 100000
 ```
 
----
+## EDA, limpieza y transformaciones
 
-## 8. Limitaciones
+El análisis completo se encuentra en [`Final.ipynb`](Final.ipynb): inspección de dimensiones y tipos, faltantes, proporción de clases (71,22% sin daño y 28,78% con daño en la muestra), filtros de árboles vivos con etiqueta conocida, revisión del diámetro y gráficos de relaciones. Se imputan categorías ausentes con categorías explícitas cuando el contexto lo permite; diámetros 0 o superiores a 60 se excluyen (el descargador ya aplica ese filtro a la muestra). Se crean tres puntajes (conflictos de raíces, tronco y ramas). Para gráficos exploratorios, se muestran las 20 especies más frecuentes más `Other`; el clasificador usa la especie original y aprende OneHotEncoder con agrupación de categorías infrecuentes dentro del pipeline (`min_frequency=10`), sin usar la frecuencia del conjunto test. El EDA muestra asociaciones descriptivas, no efectos causales.
 
-- Es una foto única de 2015: no captura cómo evoluciona el daño en el tiempo.
-- Los datos los relevaron voluntarios, así que puede haber errores de medición.
-- Asociación no es causalidad: el modelo detecta patrones estadísticos, no relaciones causa-efecto.
+## Modelo supervisado y evaluación
+
+La notebook compara Dummy, regresión logística, árbol y Random Forest mediante `StratifiedKFold` (5 folds), optimiza el bosque con GridSearchCV y reporta matriz de confusión, F1, recall, precisión, ROC-AUC e importancia por permutación/dependencia parcial. La métrica principal es F1 de `Damage`; también se informa recall porque omitir un daño observado podría ser relevante para una inspección. `train.py` fue ejecutado sobre 100.000 filas, split estratificado 80/20 y GridSearchCV. En test (20.000 filas): F1 `Damage` 0,5480; recall 0,6149; precisión 0,4942; accuracy 0,7081 y ROC-AUC 0,7414. La matriz de confusión (orden [NoDamage, Damage]) es `[[10623, 3622], [2216, 3539]]`. El Dummy mayoritario obtuvo F1 `Damage` 0 y accuracy 0,7123. La CV F1 del mejor ajuste fue 0,5441 (`max_depth=16`, `min_samples_leaf=10`, `n_estimators=100`). Estos son resultados de la muestra y el split con semilla 42; están guardados en `artifacts/metrics.json`.
+
+## Aprendizaje no supervisado
+
+[`Clustering.ipynb`](Clustering.ipynb) fue ejecutada sobre una submuestra reproducible de 10.000 árboles, excluyendo la etiqueta de daño y `sidewalk`. Silhouette fue máximo para K-Means con k=3 (0,2815; k=2: 0,2774), con tamaños 670, 7.004 y 2.326; medianas de diámetro 11, 8 y 16 pulgadas, y de conflictos radiculares 0, 0 y 1. La salud modal fue `Good` en los tres grupos. DBSCAN (eps=2,5; min_samples=20) encontró 5 grupos, 1,2% de ruido y silhouette 0,3333 en puntos no-ruido. Estos resultados son exploratorios: describen similitudes bajo esta representación y parámetros, no “tipos de riesgo” validados ni grupos naturales. La separación silhouette es modesta y las variables categóricas codificadas pueden dominar las distancias.
+
+## Entrenamiento y API FastAPI
+
+`model.py` centraliza ingeniería de variables y pipeline. `train.py` genera el modelo y las métricas. Por defecto hace una búsqueda GridSearchCV alineada con el análisis; alternativamente puede usarse Optuna TPE:
+
+```bash
+python -m pip install -r ../requirements.txt
+python download_dataset.py --rows 100000
+python train.py                         # GridSearchCV
+python train.py --tuning optuna --trials 6
+uvicorn app:app --reload
+```
+
+La API ofrece `GET /health` y `POST /predict`; Swagger en `/docs`. El cuerpo de `POST /predict` recibe `tree_dbh`, `borough`, `curb_loc`, `health`, `spc_latin`, `steward`, `guards` y las nueve variables de conflicto (`root_stone`, `root_grate`, `root_other`, `trunk_wire`, `trnk_light`, `trnk_other`, `brch_light`, `brch_shoe`, `brch_other`). Ejemplo mínimo (los conflictos omitidos toman valor `No`):
+
+```json
+{
+  "tree_dbh": 15,
+  "borough": "Brooklyn",
+  "curb_loc": "OnCurb",
+  "health": "Good",
+  "spc_latin": "Acer rubrum",
+  "steward": "None",
+  "guards": "None",
+  "root_stone": "Yes"
+}
+```
+
+La respuesta contiene una clase y una probabilidad del modelo, con advertencia de alcance. La probabilidad no está calibrada como riesgo operativo y el umbral 0,5 es demostrativo. No usar la salida para decisiones automáticas.
+
+## Sesgos, límites y uso responsable
+
+El censo es una fotografía histórica de NYC, no representativa de otras ciudades ni del presente. Fue relevado por voluntarios y puede contener errores, faltantes y cobertura desigual. La etiqueta `sidewalk` y parte de las variables se capturaron en el mismo relevamiento; no hay orden temporal que permita inferir causalidad o pronóstico futuro. `borough`, especie y condiciones del entorno pueden actuar como proxies de desigualdades en mantenimiento y cobertura. Priorizar recursos únicamente con este clasificador podría reforzar esas desigualdades, ignorar zonas subrepresentadas y generar falsas alarmas u omisiones. La predicción requiere inspección humana, validación por zona y subgrupo, datos actualizados, consulta comunitaria, auditorías periódicas y posibilidad de impugnar decisiones. No usar para sanciones, seguros o evaluación de residentes.
+
+## Reproducibilidad y estructura
+
+Requiere Python 3.10+; instalar desde la raíz con `python -m pip install -r requirements.txt`. Ejecutar `Final.ipynb` y `Clustering.ipynb` con kernel limpio tras descargar los datos. `train.py` usa semilla 42, partición estratificada y guarda artefactos bajo `artifacts/`. La API no funciona hasta que el entrenamiento genere el modelo. No se afirma que esté desplegada en la nube; una publicación pública requeriría controles de seguridad, monitoreo de drift, pruebas y datos autorizados.
+
+## Presentación y registro de IA
+
+La presentación oral de 15 minutos está en [`../Presentaciones/Proyecto_Final.html`](../Presentaciones/Proyecto_Final.html). Actualizar las diapositivas con los resultados reales obtenidos por el equipo. Si se utilizó una IA copiloto, declarar herramienta, finalidad, partes asistidas y cómo se verificó el resultado; la decisión analítica y revisión final corresponden al equipo.

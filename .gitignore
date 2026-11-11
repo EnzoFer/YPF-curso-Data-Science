@@ -28,6 +28,11 @@ start.ps1
 # Archivos pesados de datos (exceden el limite de 100MB de GitHub)
 *.csv
 Final/*.csv
+!Final/data/
+!Final/data/*.csv
+Final/artifacts/*
+!Final/artifacts/.gitkeep
+!Final/artifacts/metrics.json
 
 # Cosas que no quiero subir al repositorio
 Final/*.md
